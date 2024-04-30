@@ -1,11 +1,8 @@
 import requests
-import os
 import pandas as pd
-from dotenv import load_dotenv
+import streamlit as st 
 
-# Carregar o token de API do arquivo .env
-load_dotenv('keys.env')
-API_TOKEN = os.getenv('API_TOKEN')
+API_TOKEN = st.secrets["API_TOKEN"]
 
 def get_deals():
     url = 'https://hyper3.pipedrive.com/api/v1/deals/'
