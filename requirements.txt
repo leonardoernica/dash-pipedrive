@@ -2,3 +2,4 @@ streamlit
 pandas
 plotly
 requests
+schedule==1.1.0
