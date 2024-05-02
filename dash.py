@@ -21,19 +21,20 @@ def load_data():
 
 st.title('Dashboard Comercial - Soluções Hyper')
 
+df = load_data()
+
 # Inicializa o agendador
 scheduler = BackgroundScheduler()
 scheduler.add_job(update_deals_csv, 'interval', hours=1)
 scheduler.start()
 
 # Loop para aguardar até que o arquivo não esteja vazio
-while True:
-    df = load_data()
+while df is None:
     if df is not None:
         break
     else:
-        st.warning("Aguardando dados... Atualizando em 30 segundos.")
-        time.sleep(30)  # Espera 30 segundos antes de verificar novamente
+        st.warning("Aguardando dados...")
+        continue
 
 @st.cache_data(ttl=4000, allow_output_mutation=True)
 def get_cached_data():
