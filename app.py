@@ -1,7 +1,6 @@
 import requests
 import pandas as pd
 import os
-import schedule
 import streamlit as st 
 
 API_TOKEN = st.secrets["API_TOKEN"]
@@ -84,9 +83,3 @@ def update_deals_csv():
     deals = get_deals()
     df_funnel = create_funnel_df(deals)
     update_csv_with_new_data(df_funnel)
-
-schedule.every(1).hour.do(update_deals_csv)  # run every 1 hour
-
-while True:
-    schedule.run_pending()
-    time.sleep(60)  # sleep for 1 minute
