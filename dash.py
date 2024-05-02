@@ -8,11 +8,15 @@ from app import update_deals_csv
 def load_data():
     try:
         data = pd.read_csv('deals.csv', parse_dates=['Start Date', 'End Date'])
+        if data.empty:
+            return None  # Retorna None se o arquivo estiver vazio
         data['Owner Name'] = data['Owner Name'].fillna('Unknown').astype(str)
         return data
     except FileNotFoundError:
         st.error("O arquivo deals.csv não foi encontrado.")
-        return pd.DataFrame()
+        return None  # Retorna None se o arquivo não existir
+    except pd.errors.EmptyDataError:
+        return None  # Retorna None se o arquivo estiver completamente vazio
 
 st.title('Dashboard Comercial - Soluções Hyper')
 
@@ -21,9 +25,18 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(update_deals_csv, 'interval', hours=1)
 scheduler.start()
 
-@st.cache_data(ttl=4000, show_spinner=True)
+# Loop para aguardar até que o arquivo não esteja vazio
+while True:
+    df = load_data()
+    if df is not None:
+        break
+    else:
+        st.warning("Aguardando dados... Atualizando em 30 segundos.")
+        time.sleep(30)  # Espera 30 segundos antes de verificar novamente
+
+@st.cache_data(ttl=4000, allow_output_mutation=True)
 def get_cached_data():
-    return load_data()
+    return df  # Usa o DataFrame carregado após a verificação
 
 df = get_cached_data()
 
