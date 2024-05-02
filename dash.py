@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 import schedule
+from app import *
 schedule.every(1).hour.do(update_deals_csv)  # run every 1 hour
 
 while True:
