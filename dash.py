@@ -2,11 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from app import *
-
-deals = get_deals()
-df_funnel = create_funnel_df(deals)
-update_csv_with_new_data(df_funnel)
 
 @st.cache_data
 def load_data():
