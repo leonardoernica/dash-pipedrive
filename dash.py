@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
+import time
 from apscheduler.schedulers.background import BackgroundScheduler
 from app import update_deals_csv
 
