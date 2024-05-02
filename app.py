@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+import os
 import streamlit as st 
 
 API_TOKEN = st.secrets["API_TOKEN"]
