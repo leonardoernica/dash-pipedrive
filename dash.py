@@ -2,89 +2,61 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-# Supondo que app.py tenha a função get_deals original
-from app import get_deals as original_get_deals
 
 @st.cache_data
-def get_deals():
-    return original_get_deals()
+def load_data():
+    try:
+        data = pd.read_csv('deals.csv', parse_dates=['Start Date', 'End Date'])
+        data['Owner Name'] = data['Owner Name'].fillna('Unknown').astype(str)
+        return data
+    except FileNotFoundError:
+        st.error("O arquivo deals.csv não foi encontrado.")
+        return pd.DataFrame()
 
-data = get_deals()
-df = pd.DataFrame(data)
-# Conversão e extração de dados
-df['add_time'] = pd.to_datetime(df['add_time'])
-df['owner_name'] = df['user_id'].apply(lambda x: x['name'])
-
-# Streamlit layout
 st.title('Dashboard Comercial - Soluções Hyper')
+df = load_data()
 
-# Default time period: last 7 days to today
-default_start_date = datetime.now() - timedelta(days=7)
-default_end_date = datetime.now()
+if not df.empty:
+    default_start_date = datetime.now() - timedelta(days=7)
+    default_end_date = datetime.now()
+    start_date = st.sidebar.date_input("Data Início", default_start_date)
+    end_date = st.sidebar.date_input("Data Fim", default_end_date)
+    owner_list = ['Todos'] + sorted(df['Owner Name'].unique())
+    selected_owners = st.sidebar.multiselect('Selecione o Dono do Negócio', owner_list, default='Todos')
 
-# Sidebar - Date and owner filters
-start_date = st.sidebar.date_input("Data Início", default_start_date)
-end_date = st.sidebar.date_input("Data Fim", default_end_date)
-owner_list = ['Todos'] + list(df['owner_name'].unique())
-selected_owners = st.sidebar.multiselect('Selecione o Dono do Negócio', options=owner_list, default='Todos')
+    # Filtragem usando End Date e Status de 'won'
+    filtered_df = df[(df['Status'] == 'won') & 
+                     (df['End Date'].dt.date >= start_date) & 
+                     (df['End Date'].dt.date <= end_date) &
+                     ((df['Owner Name'].isin(selected_owners)) if 'Todos' not in selected_owners else True)]
 
-# Filter data based on dates and owner
-if 'Todos' in selected_owners or not selected_owners:
-    filtered_df = df[(df['pipeline_id'] == 1) & 
-                     (df['status'] == 'open') & 
-                     (df['add_time'].dt.date >= start_date) & 
-                     (df['add_time'].dt.date <= end_date)]
-else:
-    filtered_df = df[(df['pipeline_id'] == 1) & 
-                     (df['status'] == 'open') & 
-                     (df['add_time'].dt.date >= start_date) & 
-                     (df['add_time'].dt.date <= end_date) &
-                     (df['owner_name'].isin(selected_owners))]
+    # Garantindo que consideramos apenas o End Date mais recente de cada Deal ID
+    filtered_df = filtered_df.sort_values(by='End Date').drop_duplicates(subset=['Deal ID'], keep='last')
 
-# Filter data based on dates and owner
-if 'Todos' in selected_owners or not selected_owners:
-    df_fat = df[(df['pipeline_id'] == 1) & 
-                     (df['status'] == 'won') & 
-                     (df['add_time'].dt.date >= start_date) & 
-                     (df['add_time'].dt.date <= end_date)]
-else:
-    df_fat = df[(df['pipeline_id'] == 1) & 
-                     (df['status'] == 'won') & 
-                     (df['add_time'].dt.date >= start_date) & 
-                     (df['add_time'].dt.date <= end_date) &
-                     (df['owner_name'].isin(selected_owners))]
+    # Agrupando pelo End Date e somando os valores
+    faturamento = filtered_df.groupby(filtered_df['End Date'].dt.date)['Value'].sum()
 
-faturamento = df_fat.groupby(df_fat['add_time'].dt.date)['value'].sum()
+    fig_faturamento = px.line(
+        x=faturamento.index, y=faturamento.values,
+        labels={'x': 'Data', 'y': 'Faturamento'}, title='Faturamento'
+    )
+    fig_faturamento.update_xaxes(tickformat="%d/%m/%Y")
+    fig_faturamento.update_layout(xaxis_title="Data", yaxis_title="Faturamento (R$)")
+    st.write(f"Faturamento Total: R$ {faturamento.sum():,.2f}")
+    st.plotly_chart(fig_faturamento, use_container_width=True)
 
-# Criação do gráfico de linha para faturamento
-fig_faturamento = px.line(
-    x=faturamento.index,  # Utilizar o índice do grupo para o eixo X
-    y=faturamento.values,  # Utilizar os valores do grupo para o eixo Y
-    labels={'x': 'Data', 'y': 'Faturamento'},
-    title='Faturamento'
-)
-fig_faturamento.update_xaxes(tickformat="%d/%m/%Y")
-fig_faturamento.update_layout(xaxis_title="Data", yaxis_title="Faturamento (R$)")
+    # Filtragem usando Start Date
+    funnel_df = df[(df['pipeline_id']==1) &
+                   (df['Start Date'].dt.date >= start_date) & 
+                   (df['Start Date'].dt.date <= end_date) &
+                   ((df['Owner Name'].isin(selected_owners)) if 'Todos' not in selected_owners else True)]
 
-# Metrics
-nao_iniciados = len(filtered_df[filtered_df['stage_id'] == 1])
-iniciados = len(filtered_df[filtered_df['stage_id'] == 2])
-agendados = len(filtered_df[filtered_df['stage_id'] == 3])
-propostas = len(filtered_df[filtered_df['stage_id'] == 5])
-negociacao = len(filtered_df[filtered_df['stage_id'] == 6])
-fechamento = len(filtered_df[filtered_df['stage_id'] == 7])
+    # Reordenando os dados
+    stage_counts = funnel_df['Stage ID'].value_counts().reset_index()
+    stage_counts.columns = ['Stage ID', 'Count']
+    stage_counts = stage_counts.sort_values(by='Stage ID')  # Supondo que Stage ID menor é o topo do funil
 
-# Creating interactive bar chart with Plotly
-data = {'Status': ['Iniciados', 'Agendados', 'Propostas', 'Negociações', 'Fechamentos'],
-        'Quantidade': [iniciados, agendados, propostas, negociacao, fechamento]}
-fig = px.bar(data, x='Status', y='Quantidade', text='Quantidade')
-fig.update_traces(texttemplate='%{text:.2s}', textposition='outside')
-fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide', xaxis_title="Status", yaxis_title="Quantidade")
-
-
-# Mostrar o gráfico no Streamlit
-# Faturamento total do intervalo filtrado
-faturamento_total = faturamento.sum()
-st.write(f"Faturamento Total: R$ {faturamento_total:,.2f}")
-st.plotly_chart(fig_faturamento, use_container_width=True)
-st.plotly_chart(fig, use_container_width=True)
+    # Criando o gráfico de funil
+    fig_funnel = px.funnel(stage_counts, x='Count', y='Stage ID', orientation='h', title='Funil de Vendas por Stage ID')
+    fig_funnel.update_layout(yaxis={'categoryorder':'total ascending'})
+    st.plotly_chart(fig_funnel, use_container_width=True)
