@@ -1,6 +1,6 @@
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import streamlit as st
 import logging
 
@@ -43,13 +43,27 @@ def get_deals():
 
     return all_deals
 
-@st.cache_data
+@st.cache_resource
 def get_deals_df():
-    logging.info('Iniciando a atualização dos dados...')
-    deals = get_deals()
-    df = create_funnel_df(deals)
-    logging.info('Dados atualizados com sucesso!')
-    return df
+    last_update = st.session_state.get('last_update_time', None)
+    current_time = datetime.now()
+
+    # Atualizar somente se passou mais de 1 hora desde a última atualização
+    if last_update is None or (current_time - last_update > timedelta(hours=1)):
+        logging.info('Atualizando dados...')
+        deals = get_deals()
+        df = create_funnel_df(deals)
+        st.session_state['last_update_time'] = current_time  # Atualiza o horário da última atualização
+        logging.info('Dados atualizados com sucesso!')
+        return df
+    else:
+        logging.info('Utilizando cache de dados...')
+        return st.session_state.get('data', pd.DataFrame())  # Assegura que retorna um DataFrame vazio se 'data' não estiver definido
+
+def update_data():
+    # Essa função agora apenas chama o get_deals_df que decide se deve atualizar ou não
+    st.session_state['data'] = get_deals_df()
+    safe_update_last_update()
 
 def safe_update_last_update():
     if 'last_update' not in st.session_state:
@@ -57,16 +71,6 @@ def safe_update_last_update():
     else:
         st.session_state['last_update'] = datetime.now()
     logging.info(f"Dados atualizados em: {st.session_state['last_update']}")
-
-def update_data():
-    logging.info("Tentativa de atualização dos dados iniciada.")
-    if 'data' not in st.session_state:
-        logging.info("Nenhum dado pré-existente encontrado. Obtendo novos dados...")
-        st.session_state['data'] = get_deals_df()
-    else:
-        logging.info("Atualizando dados existentes...")
-        st.session_state['data'] = get_deals_df()
-    safe_update_last_update()
 
 def create_funnel_df(deals):
     print('Iniciando Data Frame...')
