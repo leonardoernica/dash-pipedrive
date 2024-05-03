@@ -1,7 +1,11 @@
 import requests
 import pandas as pd
-import os
-import streamlit as st 
+from datetime import datetime
+import streamlit as st
+import logging
+
+# Configurando o logging
+logging.basicConfig(level=logging.INFO)
 
 API_TOKEN = st.secrets["API_TOKEN"]
 
@@ -12,18 +16,12 @@ def get_deal_details(deal_id):
     response = requests.get(detail_url, params=params)
     response.raise_for_status()
     print('Finalizando Get Deal Details...')
-    deal_data = response.json()['data']
-    # Supondo que 'owner_name' possa ser extraído diretamente do detalhe do deal
-    return deal_data
+    return response.json()['data']
 
 def get_deals():
     print('Iniciando Get Deals...')
     url = 'https://hyper3.pipedrive.com/api/v1/deals/'
-    params = {
-        'api_token': API_TOKEN,
-        'limit': 100,  # Número máximo de itens por página
-        'start': 0
-    }
+    params = {'api_token': API_TOKEN, 'limit': 100, 'start': 0}
     all_deals = []
 
     while True:
@@ -45,6 +43,31 @@ def get_deals():
 
     return all_deals
 
+@st.cache_data
+def get_deals_df():
+    logging.info('Iniciando a atualização dos dados...')
+    deals = get_deals()
+    df = create_funnel_df(deals)
+    logging.info('Dados atualizados com sucesso!')
+    return df
+
+def safe_update_last_update():
+    if 'last_update' not in st.session_state:
+        st.session_state['last_update'] = datetime.now()
+    else:
+        st.session_state['last_update'] = datetime.now()
+    logging.info(f"Dados atualizados em: {st.session_state['last_update']}")
+
+def update_data():
+    logging.info("Tentativa de atualização dos dados iniciada.")
+    if 'data' not in st.session_state:
+        logging.info("Nenhum dado pré-existente encontrado. Obtendo novos dados...")
+        st.session_state['data'] = get_deals_df()
+    else:
+        logging.info("Atualizando dados existentes...")
+        st.session_state['data'] = get_deals_df()
+    safe_update_last_update()
+
 def create_funnel_df(deals):
     print('Iniciando Data Frame...')
     data = []
@@ -62,24 +85,9 @@ def create_funnel_df(deals):
                 'End Date': end_date,
                 'Value': deal['value'],
                 'Status': deal['status'],
-                'Owner Name': deal.get('owner_name', 'Unknown'),  # Garantindo que 'owner_name' seja capturado
-                'pipeline_id': deal.get('pipeline_id')  # Garantindo que 'pipeline_id' seja capturado
+                'Owner Name': deal.get('owner_name', 'Unknown'),
+                'pipeline_id': deal.get('pipeline_id')
             })
             total_seconds += duration
             current_date = end_date
     return pd.DataFrame(data)
-
-def update_csv_with_new_data(df_new):
-    if os.path.exists('deals.csv'):
-        df_existing = pd.read_csv('deals.csv', parse_dates=['Start Date', 'End Date'])
-    else:
-        df_existing = pd.DataFrame(columns=df_new.columns)
-
-    df_combined = pd.concat([df_existing, df_new]).drop_duplicates(subset=['Deal ID', 'Stage ID'], keep='last')
-    df_combined.to_csv('deals.csv', index=False)
-    print('CSV atualizado com sucesso!')
-
-def update_deals_csv():
-    deals = get_deals()
-    df_funnel = create_funnel_df(deals)
-    update_csv_with_new_data(df_funnel)
