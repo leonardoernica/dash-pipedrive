@@ -2,45 +2,44 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-import time
 from apscheduler.schedulers.background import BackgroundScheduler
-from app import update_deals_csv
+import pytz
+from app import update_data
 
-def load_data():
-    try:
-        data = pd.read_csv('deals.csv', parse_dates=['Start Date', 'End Date'])
-        if data.empty:
-            return None  # Retorna None se o arquivo estiver vazio
-        data['Owner Name'] = data['Owner Name'].fillna('Unknown').astype(str)
-        return data
-    except FileNotFoundError:
-        st.error("O arquivo deals.csv não foi encontrado.")
-        return None  # Retorna None se o arquivo não existir
-    except pd.errors.EmptyDataError:
-        return None  # Retorna None se o arquivo estiver completamente vazio
-
+# Inicialização segura das chaves do session_state
+if 'data' not in st.session_state:
+    st.session_state['data'] = pd.DataFrame()
+if 'last_update' not in st.session_state:
+    st.session_state['last_update'] = datetime.now()
+    
 st.title('Dashboard Comercial - Soluções Hyper')
 
-df = load_data()
+scheduler = BackgroundScheduler(timezone=pytz.timezone('America/Sao_Paulo'))
 
-# Inicializa o agendador
-scheduler = BackgroundScheduler()
-scheduler.add_job(update_deals_csv, 'interval', hours=1)
+def scheduled_job():
+    print(f"Executando o trabalho agendado em: {datetime.now(pytz.timezone('America/Sao_Paulo'))}")
+    update_data()
+
+scheduler.add_job(scheduled_job, 'interval', minutes=40, next_run_time=datetime.now())
 scheduler.start()
 
-# Loop para aguardar até que o arquivo não esteja vazio
-while df is None:
-    if df is not None:
-        break
-    else:
-        st.warning("Aguardando dados...")
-        continue
+# Para manter o script rodando
+import time
+try:
+    while True:
+        time.sleep(2)
+except (KeyboardInterrupt, SystemExit):
+    scheduler.shutdown()
 
-@st.cache_data(ttl=4000, allow_output_mutation=True)
+# Função para obter dados da memória
 def get_cached_data():
-    return df  # Usa o DataFrame carregado após a verificação
+    return st.session_state['data'] if 'data' in st.session_state else pd.DataFrame()
 
 df = get_cached_data()
+
+# Mostrando o horário da última atualização
+if 'last_update' in st.session_state:
+    st.write(f"Última atualização dos dados: {st.session_state['last_update']}")
 
 if df.empty:
     st.write("Nenhum dado disponível para exibir.")
@@ -78,8 +77,7 @@ else:
     if funnel_df.empty:
         st.write("Sem dados no funil para esta pesquisa.")
     else:
-        # Adicionando garantia de representação de todos os Stages, mesmo que seja zero
-        all_stages = pd.DataFrame({'Stage ID': range(1, 8), 'Count': [0]*7})  # Adapte conforme o número de Stages
+        all_stages = pd.DataFrame({'Stage ID': range(1, 8), 'Count': [0]*7})
         stage_counts = funnel_df['Stage ID'].value_counts().reset_index()
         stage_counts.columns = ['Stage ID', 'Count']
         stage_counts = pd.merge(all_stages, stage_counts, on='Stage ID', how='left').fillna(0)
