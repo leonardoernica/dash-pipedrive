@@ -2,34 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from apscheduler.schedulers.background import BackgroundScheduler
-import pytz
 from app import update_data
 
-# Inicialização segura das chaves do session_state
-if 'data' not in st.session_state:
-    st.session_state['data'] = pd.DataFrame()
-if 'last_update' not in st.session_state:
-    st.session_state['last_update'] = datetime.now()
-    
 st.title('Dashboard Comercial - Soluções Hyper')
 
-scheduler = BackgroundScheduler(timezone=pytz.timezone('America/Sao_Paulo'))
-
-def scheduled_job():
-    print(f"Executando o trabalho agendado em: {datetime.now(pytz.timezone('America/Sao_Paulo'))}")
-    update_data()
-
-scheduler.add_job(scheduled_job, 'interval', minutes=40, next_run_time=datetime.now())
-scheduler.start()
-
-# Para manter o script rodando
-import time
-try:
-    while True:
-        time.sleep(2)
-except (KeyboardInterrupt, SystemExit):
-    scheduler.shutdown()
+update_data()
 
 # Função para obter dados da memória
 def get_cached_data():
