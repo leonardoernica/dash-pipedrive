@@ -34,6 +34,7 @@ else:
     if filtered_df.empty:
         st.write("Nenhum resultado encontrado para os filtros aplicados.")
     else:
+        filtered_df = filtered_df.sort_values(by='End Date').drop_duplicates(subset=['Deal ID'], keep='last')
         faturamento = filtered_df.groupby(filtered_df['End Date'].dt.date)['Value'].sum()
         if not faturamento.empty:
             fig_faturamento = px.line(
