@@ -57,6 +57,11 @@ else:
         all_stages = pd.DataFrame({'Stage ID': range(1, 8), 'Count': [0]*7})
         stage_counts = funnel_df['Stage ID'].value_counts().reset_index()
         stage_counts.columns = ['Stage ID', 'Count']
+
+        # Assegure que 'Stage ID' é do tipo int em ambos os DataFrames
+        all_stages['Stage ID'] = all_stages['Stage ID'].astype(int)
+        stage_counts['Stage ID'] = stage_counts['Stage ID'].astype(int)
+
         stage_counts = pd.merge(all_stages, stage_counts, on='Stage ID', how='left').fillna(0)
         stage_counts['Count'] = stage_counts['Count_y']
         fig_funnel = px.funnel(stage_counts, x='Count', y='Stage ID', orientation='h', title='Funil de Vendas por Stage ID')
