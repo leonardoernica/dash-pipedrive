@@ -1,7 +1,5 @@
 import requests
-import os
 import pandas as pd
-from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import streamlit as st
 import logging
@@ -9,10 +7,7 @@ import logging
 # Configurando o logging
 logging.basicConfig(level=logging.INFO)
 
-# Carregar o token de API do arquivo .env
-load_dotenv('keys.env')
-API_TOKEN = os.getenv('API_TOKEN')
-DATA_FILE = 'deals_data.json'
+API_TOKEN = st.secrets["API_TOKEN"]
 
 def get_deal_details(deal_id):
     print('Iniciando Get Deal Details...')
