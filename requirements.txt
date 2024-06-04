@@ -4,3 +4,4 @@ plotly
 requests
 pytz
 APScheduler==3.10.4
+python-dotenv
