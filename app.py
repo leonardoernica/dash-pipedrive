@@ -1,5 +1,7 @@
 import requests
+import os
 import pandas as pd
+from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import streamlit as st
 import logging
@@ -7,7 +9,10 @@ import logging
 # Configurando o logging
 logging.basicConfig(level=logging.INFO)
 
-API_TOKEN = st.secrets["API_TOKEN"]
+# Carregar o token de API do arquivo .env
+load_dotenv('keys.env')
+API_TOKEN = os.getenv('API_TOKEN')
+DATA_FILE = 'deals_data.json'
 
 def get_deal_details(deal_id):
     print('Iniciando Get Deal Details...')
@@ -90,7 +95,8 @@ def create_funnel_df(deals):
                 'Value': deal['value'],
                 'Status': deal['status'],
                 'Owner Name': deal.get('owner_name', 'Unknown'),
-                'pipeline_id': deal.get('pipeline_id')
+                'pipeline_id': deal.get('pipeline_id'),
+                'lost_reason': deal.get('lost_reason', "") 
             })
             total_seconds += duration
             current_date = end_date
